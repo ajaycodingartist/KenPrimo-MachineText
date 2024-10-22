@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Reservation</title>
+    <!-- <link rel="stylesheet" href="styles.css"> -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        const csrfToken = "{{ csrf_token }}"; 
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 50%;
+            margin: 50px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #available-rooms,
+        #reservation-form-container {
+            margin-top: 30px;
+        }
+
+        #rooms-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        #rooms-list li {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        #rooms-list li:hover {
+            background-color: #e2e2e2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Hotel Reservation System</h1>
+
+        <!-- Room Availability Check Form -->
+        <form id="availability-form">
+            <div class="form-group">
+                <label for="room-category">Room Category</label>
+                <select id="room-category" name="room-category">
+                    <!-- Room categories will be populated dynamically -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="start-date">Start Date</label>
+                <input type="date" id="start-date" name="start-date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="end-date">End Date</label>
+                <input type="date" id="end-date" name="end-date" required>
+            </div>
+
+            <button type="submit">Check Availability</button>
+        </form>
+
+        <!-- Available Rooms -->
+        <div id="available-rooms">
+            <h2>Available Rooms</h2>
+            <ul id="rooms-list">
+                <!-- Available rooms will be displayed here -->
+            </ul>
+        </div>
+
+        <!-- Reservation Form -->
+        <div id="reservation-form-container">
+            <h2>Book a Room</h2>
+            <form id="reservation-form">
+                <input type="text" id="selected-room-number" name="room-number">
+
+                <div class="form-group">
+                    <label for="customer-name">Customer Name</label>
+                    <input type="text" id="customer-name" name="customer-name" required>
+                </div>
+
+                <button type="submit">Reserve Room</button>
+            </form>
+        </div>
+
+
+        <!-- Reservation Summary -->
+        <!-- <div id="reservation-summary" style="display: none;"> -->
+        <div id="reservation-summary">
+            <h2>Reservation Summary</h2>
+            <p id="summary-room-number"></p>
+            <p id="summary-start-date"></p>
+            <p id="summary-end-date"></p>
+            <p id="summary-total-price"></p>
+        </div>
+    </div>
+
+    <script>
+
+
+        $('#rooms-list').on('click', 'li', function () {
+            var roomId = $(this).text(); // Get the room ID from data-id attribute
+            $('#selected-room-number').val(roomId); // Set the room ID in the hidden input field
+            // alert('Room ' + $(this).text() + ' selected.'); // Optionally alert the user
+
+        });
+
+
+
+        // Fetch room categories on page load
+        $(document).ready(function () {
+            $.get('/api/room-categories/', function (data) {
+                var categorySelect = $('#room-category');
+                categorySelect.empty(); // Clear any existing options
+                categorySelect.append('<option value="">Select a Category</option>'); // Optional default option
+
+                // Ensure you're iterating through the categories properly
+                data.forEach(function (category) {
+                    categorySelect.append(`<option value="${category.id}">${category.name}</option>`);
+                });
+            }).fail(function () {
+                alert('Error fetching room categories.');
+            });
+        });
+
+
+
+
+        // Handle availability check form submission
+        $('#availability-form').on('submit', function (event) {
+            event.preventDefault();
+
+            var categoryId = $('#room-category').val();
+            var startDate = $('#start-date').val();
+            var endDate = $('#end-date').val();
+
+            $.get('/api/available-rooms/', {
+                category_id: categoryId,
+                start_date: startDate,
+                end_date: endDate
+            }, function (data) {
+                var roomsList = $('#rooms-list');
+                roomsList.empty(); // Clear existing rooms
+
+                if (data.available_rooms.length > 0) {
+                    data.available_rooms.forEach(function (room) {
+                        // Append rooms with a clickable event to select the room number
+                        roomsList.append(`<li class="room-item" data-room-number="${room}">${room}</li>`);
+                        // roomsList.append(`<li class="room-item" data-room-number="${room}">Room: ${room}, Base Price: $${room.base_price}</li>`);
+                    });
+
+                    // Show the reservation form if rooms are available
+                    $('#reservation-form').show();
+
+                    // Handle room selection
+                    $('.room-item').on('click', function () {
+                        var selectedRoomNumber = $(this).data('room-number');
+                        $('#selected-room-number').val(selectedRoomNumber);  // Store the selected room number in the hidden input field
+                        alert('Room ' + selectedRoomNumber + ' selected.');
+                    });
+                } else {
+                    roomsList.append('<li>No rooms available for the selected dates.</li>');
+                    $('#reservation-form').hide();
+                }
+            }).fail(function () {
+                alert('Error fetching available rooms.');
+            });
+        });
+
+
+
+
+
+        //     $('#reservation-form').on('submit', function(event) {
+        //     event.preventDefault();
+
+        //     var customerName = $('#customer-name').val();
+        //     var selectedRoom = $('#selected-room-number').val(); // Ensure this is set correctly
+        //     var startDate = $('#start-date').val();
+        //     var endDate = $('#end-date').val();
+
+        //     $.post('/api/make-reservation/', {
+        //         customer_name: customerName,
+        //         room_number: selectedRoom,
+        //         start_date: startDate,
+        //         end_date: endDate
+        //     })
+        //     .done(function(data) {
+        //         alert('Reservation successful!');
+        //     })
+        //     .fail(function(xhr) {
+        //         alert('Error making reservation: ' + xhr.responseJSON.error);
+        //     });
+        // });
+
+        $('#reservation-form').on('submit', function (event) {
+            event.preventDefault();
+
+            var customerName = $('#customer-name').val();
+            var selectedRoom = $('#selected-room-number').val();
+            var startDate = $('#start-date').val();
+            var endDate = $('#end-date').val();
+
+            // console.log('Making reservation with room number:', selectedRoom);
+
+            console.log('Submitting reservation:', {
+                customer_name: customerName,
+                room_number: selectedRoom,
+                start_date: startDate,
+                end_date: endDate
+            });
+
+            $.ajax({
+                url: '/api/make-reservation/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    customer_name: customerName,
+                    room_number: selectedRoom,
+                    start_date: startDate,
+                    end_date: endDate
+                }),
+                success: function (data) {
+
+                    // / Assuming data contains the total price returned from the server
+                    var totalPrice = data.total_price; // Adjust this based on your API response structure
+
+                    console.log(totalPrice);
+
+
+                    // Update the reservation summary
+                    $('#summary-room-number').text('Room Number: ' + selectedRoom);
+                    $('#summary-total-price').text('Total Price: $' + totalPrice);
+                    $('#summary-start-date').text('Start Date: ' + startDate);
+                    $('#summary-end-date').text('End Date: ' + endDate);
+                    $('#reservation-summary').show(); // Show the reservation summary
+
+                    alert('Reservation successful!');
+                },
+                error: function (xhr) {
+                    alert('Error making reservation: ' + xhr.responseJSON.error);
+                }
+            });
+        });
+
+    </script>
+</body>
+
+</html>
